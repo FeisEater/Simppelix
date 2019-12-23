@@ -2,6 +2,8 @@ import numpy as np
 
 #S = np.matrix([[-6.0,-3.0,-3.0,0.0,0.0,0.0],[1.0,3.0,2.0,1.0,0.0,0.0],[2.0,2.0,-1.0,0.0,1.0,0.0],[3.0,-1.0,3.0,0.0,0.0,1.0]])
 S = np.matrix([[0.0,1.0,1.0,1.0,1.0,1.0],[1.0,3.0,2.0,1.0,0.0,0.0],[3.0,5.0,1.0,1.0,1.0,0.0],[4.0,2.0,5.0,1.0,0.0,1.0]])
+#Following has infinite loop
+#S = np.matrix([[0.0,0.0,2.0,0.0,1.0,0.0,0.0,5.0],[4.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0],[2.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0],[3.0,0.0,0.0,1.0,0.0,0.0,1.0,0.0],[6.0,0.0,3.0,1.0,0.0,0.0,0.0,1.0]])
 status = "calculating"
 SnoZero = S[1:,1:]
 colSize = SnoZero.shape[0]
@@ -60,10 +62,19 @@ if missingBasis > 0:
     status = "feasible set empty"
     print(status)
     exit()
+  while not np.all(basis >= missingBasis):
+    print("Driving out artificial variables...")
+    pivotRowIdx = 2 + np.where(basis < missingBasis)[0][0]
+    pivotColChoose = lambda x: x in basis and x != 0
+    pivotColIdx = 1 + missingBasis + np.where(pivotColChoose(S[pivotRowIdx,1+missingBasis:]))[1][0]
+    S[pivotRowIdx] = S[pivotRowIdx] / S[pivotRowIdx, pivotColIdx]
+    for i in range(S.shape[0]):
+      if i == pivotRowIdx:
+        continue
+      S[i] -= S[i, pivotColIdx]*S[pivotRowIdx]    
   S = np.delete(S, 1, 0)
   S = np.delete(S, range(1, 1+missingBasis), 1)
   basis -= missingBasis
-  #TODO: handle third first phase outcome
 coreSimplex()
 print(S)
 print(basis)
