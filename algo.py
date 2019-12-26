@@ -1,8 +1,6 @@
 import numpy as np
 
-#S = np.matrix([[-6.0,-3.0,-3.0,0.0,0.0,0.0],[1.0,3.0,2.0,1.0,0.0,0.0],[2.0,2.0,-1.0,0.0,1.0,0.0],[3.0,-1.0,3.0,0.0,0.0,1.0]])
 S = np.matrix([[0.0,1.0,1.0,1.0,1.0,1.0],[1.0,3.0,2.0,1.0,0.0,0.0],[3.0,5.0,1.0,1.0,1.0,0.0],[4.0,2.0,5.0,1.0,0.0,1.0]])
-#Following has infinite loop
 #S = np.matrix([[0.0,0.0,2.0,0.0,1.0,0.0,0.0,5.0],[4.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0],[2.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0],[3.0,0.0,0.0,1.0,0.0,0.0,1.0,0.0],[6.0,0.0,3.0,1.0,0.0,0.0,0.0,1.0]])
 status = "calculating"
 SnoZero = S[1:,1:]
@@ -18,6 +16,8 @@ for i in range(colSize):
 missingBasis = np.count_nonzero(basis < 0)
 
 def coreSimplex(twoPhase=False):
+  divide = np.vectorize(lambda a,b: a/b if b > 0 else np.inf)
+  status = "calculating"
   objRow = 1 if twoPhase else 0
   for idx,col in enumerate(basis):
     S[objRow,:] = S[objRow,:] - S[objRow,col+1]*S[objRow+idx+1,:]
@@ -33,7 +33,7 @@ def coreSimplex(twoPhase=False):
     if np.all(pivotCol[objRow+1:] <= 0):
       status = "unbounded"
       break
-    pivotRowIdx = objRow + 1 + np.argmin(S[objRow+1:,0] / np.maximum(pivotCol[objRow+1:], 0))
+    pivotRowIdx = objRow + 1 + np.argmin(divide(S[objRow+1:,0], pivotCol[objRow+1:]))
     basis[pivotRowIdx-objRow-1] = pivotColIdx-1
     S[pivotRowIdx] = S[pivotRowIdx] / pivotCol[pivotRowIdx]
     for i in range(S.shape[0]):
@@ -65,13 +65,14 @@ if missingBasis > 0:
   while not np.all(basis >= missingBasis):
     print("Driving out artificial variables...")
     pivotRowIdx = 2 + np.where(basis < missingBasis)[0][0]
-    pivotColChoose = lambda x: x in basis and x != 0
-    pivotColIdx = 1 + missingBasis + np.where(pivotColChoose(S[pivotRowIdx,1+missingBasis:]))[1][0]
+    pivotColChoose = lambda x: x not in basis and x != 0
+    pivotColIdx = 1 + missingBasis + np.where(pivotColChoose(S[pivotRowIdx,1+missingBasis:]))[0][0]
+    basis[pivotRowIdx-2] = pivotColIdx-1
     S[pivotRowIdx] = S[pivotRowIdx] / S[pivotRowIdx, pivotColIdx]
     for i in range(S.shape[0]):
       if i == pivotRowIdx:
         continue
-      S[i] -= S[i, pivotColIdx]*S[pivotRowIdx]    
+      S[i] -= S[i, pivotColIdx]*S[pivotRowIdx]
   S = np.delete(S, 1, 0)
   S = np.delete(S, range(1, 1+missingBasis), 1)
   basis -= missingBasis
