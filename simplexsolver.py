@@ -296,9 +296,11 @@ class SimplexSolver:
       self.status = "objective not set"   #Human readable status
       self.isDone = False                 #Solver has ended its execution
 
+    '''One step of solving process, could be used to analyze solving process from outside this class'''
     def solveStep(self):
       self.__stateMethods[self.__state]()
 
+    '''Solve call'''
     def solve(self):
       while self.__state is not SolverState.DONE:
         self.solveStep()
