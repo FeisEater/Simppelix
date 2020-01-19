@@ -178,6 +178,7 @@ class SimplexSolver:
       for idx,col in enumerate(self.__basis):
         self.__S[objRow,:] = self.__S[objRow,:] - self.__S[objRow,col+1]*self.__S[objRow+idx+1,:]
     
+    '''Calculation up to core simplex execution'''
     def __presolveStep(self):
       self.status = "preprocessing"
       #Delete unneeded variables and their corresponding columns
@@ -225,6 +226,7 @@ class SimplexSolver:
         self.__state = SolverState.PHASE2_STEP
         self.status = "calculating"
 
+    '''Phase 1 Simplex in two-phase Simplex execution'''
     def __phase1Step(self):
       if self.__coreSimplex(True):
         #Feasible set empty, end solving
@@ -236,6 +238,10 @@ class SimplexSolver:
           self.__state = SolverState.DRIVEOUT_STEP
           self.status = "driving out artificial variables"
 
+    '''
+    Iteration of driving out artificial variables in case after
+    phase 1 there are still artificial variables in basis
+    '''
     def __driveoutStep(self):
       if np.all(self.__basis >= self.__missingBasis):
         self.__S = np.delete(self.__S, 1, 0)
@@ -256,6 +262,7 @@ class SimplexSolver:
             continue
           self.__S[i] -= self.__S[i, pivotColIdx]*self.__S[pivotRowIdx]
 
+    '''Standard Simplex or phase 2 Simplex for two-phase Simplex execution. Gathers results on succesful execution'''
     def __phase2Step(self):
       if self.__coreSimplex():
         #Gather results
@@ -271,6 +278,7 @@ class SimplexSolver:
         self.status = "done"
         self.isDone = True
 
+    '''Dummy method in case iteration called on solver that is done'''
     def __doneStep(self):
       pass
 
