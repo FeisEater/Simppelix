@@ -9,6 +9,78 @@ class SolverState(Enum):
     DONE = auto()
 
 class SimplexSolver:
+    
+    def __stripReturnChar(self, str):
+      if str[-1] == '\n':
+        return str[:-1]
+      return str
+
+    '''
+    Reads MPS file to solve LP problem. Currently does not support RANGES and BOUNDS
+    mpsName - file location string of MPS file
+    '''
+    def readMps(self, mpsName):
+      with open(mpsName, encoding='utf16') as f:
+        mode = ""
+        rowMap = {}
+        rowCount = 1
+        varCount = 1
+        objectiveRow = ""
+        for line in f:
+          if len(line) == 0:
+            continue
+          if line[0] != ' ':
+            mode = line.strip().upper()
+            continue
+          if mode == "ROWS":
+            boundType = line[0:4].upper()
+            rowName = self.__stripReturnChar(line[4:].upper()).strip()
+            if boundType != " N  ":
+              self.__S = np.insert(self.__S, self.__S.shape[0], 0, axis=0)
+              rowMap[rowName] = rowCount
+              rowCount += 1
+              lessThan = boundType == " L  "
+              moreThan = boundType == " G  "
+              if lessThan:
+                slackVarName = "*slack-{}*".format(self.__slackVars)
+                slackVar = 1.0
+              elif moreThan:
+                slackVarName = "*surplus-{}*".format(self.__slackVars)
+                slackVar = -1.0
+              if lessThan or moreThan:
+                varLen = len(self.__vars) + 1
+                self.__vars[slackVarName] = varLen
+                self.__S = np.insert(self.__S, self.__S.shape[1], 0, axis=1)
+                self.__S[self.__S.shape[0] - 1, self.__S.shape[1] - 1] = slackVar
+                self.__slackVars += 1
+            else:
+              if objectiveRow != "":
+                continue
+              objectiveRow = rowName
+              rowMap[rowName] = 0
+          elif mode == "COLUMNS":
+            varName = line[4:12].upper().strip()
+            if varName not in self.__vars:
+              self.__vars[varName] = varCount
+              self.__S = np.insert(self.__S, varCount, 0, axis=1)
+              varCount += 1
+            rowName1 = line[12:22].upper().strip()
+            value1 = float(self.__stripReturnChar(line[22:min(36,len(line))].strip()))
+            self.__S[rowMap[rowName1], self.__vars[varName]] = value1
+            if len(line) >= 47:
+              rowName2 = line[36:47].upper().strip()
+              value2 = float(self.__stripReturnChar(line[47:].strip()))
+              self.__S[rowMap[rowName2], self.__vars[varName]] = value2
+          elif mode == "RHS":
+            rowName1 = line[12:22].upper().strip()
+            value1 = float(self.__stripReturnChar(line[22:min(36,len(line))].strip()))
+            self.__S[rowMap[rowName1], 0] = value1
+            if len(line) >= 47:
+              rowName2 = line[36:47].upper().strip()
+              value2 = float(self.__stripReturnChar(line[47:].strip()))
+              self.__S[rowMap[rowName2], 0] = value2
+      self.status = "not started"
+
     '''Split term to coefficient and var'''
     def __splitToCoeffAndVar(self, x):
       split = x.split('*')
@@ -109,7 +181,6 @@ class SimplexSolver:
     '''
     def __coreSimplex(self, twoPhase=False):
       divide = np.vectorize(lambda a,b: a/b if b > 0 else np.inf)
-      self.status = "calculating"
       objRow = 1 if twoPhase else 0
       negRow0 = self.__S[objRow,1:] >= 0.0
       if np.all(negRow0):
@@ -230,7 +301,7 @@ class SimplexSolver:
     def __phase1Step(self):
       if self.__coreSimplex(True):
         #Feasible set empty, end solving
-        if self.__S[1,0] > 0:
+        if self.__S[1,0] > 10e-6:
           self.__state = SolverState.DONE
           self.status = "feasible set empty"
           self.isDone = True

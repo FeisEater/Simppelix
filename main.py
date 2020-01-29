@@ -1,4 +1,5 @@
 import simplexsolver
+import time
 
 solver = simplexsolver.SimplexSolver()          #Initiate solver object
 solver.setObjective("x1 + x2 + x3 + x4 + x5")   #Set objective
@@ -28,3 +29,22 @@ print("Optimum: {}".format(solver.opt))
 print("with following variable substitutions:")
 for var, value in solver.optVars.items():       #optVars is dictionary of variables as keys and their substitutions as values
   print("{}: {}".format(var, value))
+
+solver = simplexsolver.SimplexSolver()
+solver.setObjective("x + 4*y + 9*z")
+solver.addConstraint("x + y <= 5")
+solver.addConstraint("x + z >= 10")
+solver.addConstraint("-y + z = 7")
+solver.addConstraint("x <= 4")
+solver.addConstraint("y >= -1")
+solver.addConstraint("y <= 1")
+solver.solve()
+print("Optimum: {}".format(solver.opt))
+for var, value in solver.optVars.items():
+  print("{}: {}".format(var, value))
+
+solver.clear()
+solver.readMps("../mps/afiro.mps")              #Read MPS file
+solver.solve()
+print("Optimum: {}".format(solver.opt))
+
