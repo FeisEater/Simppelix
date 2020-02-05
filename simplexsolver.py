@@ -79,6 +79,9 @@ class SimplexSolver:
               rowName2 = line[36:47].upper().strip()
               value2 = float(self.__stripReturnChar(line[47:].strip()))
               self.__S[rowMap[rowName2], 0] = value2
+          else:
+            print("{} not supported".format(mode))
+            break
       self.status = "not started"
 
     '''Split term to coefficient and var'''
@@ -180,7 +183,7 @@ class SimplexSolver:
       or LP is unbounded, in which case isDone is set to True.
     '''
     def __coreSimplex(self, twoPhase=False):
-      divide = np.vectorize(lambda a,b: a/b if b > 0 else np.inf)
+      divide = np.vectorize(lambda a,b: a/b if b > 10e-6 else np.inf)
       objRow = 1 if twoPhase else 0
       negRow0 = self.__S[objRow,1:] >= 0.0
       if np.all(negRow0):
@@ -252,6 +255,11 @@ class SimplexSolver:
     '''Calculation up to core simplex execution'''
     def __presolveStep(self):
       self.status = "preprocessing"
+
+      #Flip signs of a row if rhs is negative
+      negativeRows = 1 + np.where(self.__S[1:,0] < 0)[0]
+      self.__S[negativeRows,:] = -1.0 * self.__S[negativeRows,:]
+
       #Delete unneeded variables and their corresponding columns
       self.__S = np.delete(self.__S, self.__varsToDelete, 1)
       #Invert vars dictionary
@@ -272,6 +280,7 @@ class SimplexSolver:
         for j in range(SnoZero.shape[1]):
           if np.all(np.transpose(SnoZero[:,j]) == unit):
             self.__basis[i] = j
+            break
         unit[i] = 0
       self.__missingBasis = np.count_nonzero(self.__basis < 0)
       #Couldn't find whole basis, do two phase Simplex
@@ -323,15 +332,22 @@ class SimplexSolver:
         self.status = "calculating phase 2 Simplex"
       else:
         #Artificial variable in basis, need to drive it out
-        pivotRowIdx = 2 + np.where(self.__basis < self.__missingBasis)[0][0]
-        pivotColChoose = lambda x: x not in self.__basis and x != 0
-        pivotColIdx = 1 + self.__missingBasis + np.where(pivotColChoose(self.__S[pivotRowIdx,1+self.__missingBasis:]))[0][0]
-        self.__basis[pivotRowIdx-2] = pivotColIdx-1
-        self.__S[pivotRowIdx] = self.__S[pivotRowIdx] / self.__S[pivotRowIdx, pivotColIdx]
-        for i in range(self.__S.shape[0]):
-          if i == pivotRowIdx:
+        artificialsInBasis = 2 + np.where(self.__basis < self.__missingBasis)[0]
+        for pivotRowIdx in artificialsInBasis:
+          nonzeroEntires = np.where(self.__S[pivotRowIdx,(1+self.__missingBasis):] != 0)[1]
+          if len(nonzeroEntires) == 0:
             continue
-          self.__S[i] -= self.__S[i, pivotColIdx]*self.__S[pivotRowIdx]
+          for x in nonzeroEntires:
+            if x not in self.__basis:
+              pivotColIdx = 1 + self.__missingBasis + x
+              break
+          self.__basis[pivotRowIdx-2] = pivotColIdx-1
+          self.__S[pivotRowIdx] = self.__S[pivotRowIdx] / self.__S[pivotRowIdx, pivotColIdx]
+          for i in range(self.__S.shape[0]):
+            if i == pivotRowIdx:
+              continue
+            self.__S[i] -= self.__S[i, pivotColIdx]*self.__S[pivotRowIdx]
+          break
 
     '''Standard Simplex or phase 2 Simplex for two-phase Simplex execution. Gathers results on succesful execution'''
     def __phase2Step(self):
